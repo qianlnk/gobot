@@ -60,6 +60,13 @@ type Contact struct {
 	IsOwner          int      `json:"IsOwner"`
 }
 
+type Contacts struct {
+	BaseResponse BaseResponse `json:"BaseResponse"`
+	MemberCount  int          `json:"MemberCount"`
+	MemberList   []Contact    `json:"MemberList"`
+	Seq          int          `json:"Seq"`
+}
+
 type SyncKeyList struct {
 	Key int `json:"Key"`
 	Val int `json:"Val"`

@@ -37,6 +37,7 @@ type Wecat struct {
 	client      *http.Client
 	auto        bool
 	showRebot   bool
+	contacts    map[string]Contact
 }
 
 const (
@@ -76,6 +77,7 @@ func NewWecat(cfg Config) (*Wecat, error) {
 		client:      client,
 		deviceID:    "e" + randID[2:17],
 		baseRequest: make(map[string]interface{}),
+		contacts:    make(map[string]Contact),
 		auto:        true,
 	}, nil
 }
@@ -295,6 +297,31 @@ func (w *Wecat) StatusNotify() error {
 	return nil
 }
 
+func (w *Wecat) GetContact() error {
+	uri := fmt.Sprintf("%s/webwxgetcontact?sid=%s&skey=%s&pass_ticket=%s", w.baseURI, w.loginRes.Wxsid, w.loginRes.Skey, w.loginRes.PassTicket)
+	params := make(map[string]interface{})
+	params["BaseRequest"] = w.baseRequest
+
+	data, err := w.post(uri, params)
+	if err != nil {
+		return err
+	}
+
+	var contacts Contacts
+	if err := json.Unmarshal(data, &contacts); err != nil {
+		return err
+	}
+
+	for _, contact := range contacts.MemberList {
+		if contact.NickName == "" {
+			contact.NickName = contact.UserName
+		}
+		w.contacts[contact.UserName] = contact
+	}
+
+	return nil
+}
+
 func (w *Wecat) WxSync() (*Message, error) {
 	uri := fmt.Sprintf("%s/webwxsync?sid=%s&skey=%s&pass_ticket=%s", w.baseURI, w.loginRes.Wxsid, w.loginRes.Skey, w.loginRes.PassTicket)
 	params := make(map[string]interface{})
@@ -397,7 +424,24 @@ func (w *Wecat) SendMessage(message string, to string) error {
 	return nil
 }
 
+func (w *Wecat) getNickName(userName string) string {
+	if v, ok := w.contacts[userName]; ok {
+		return v.NickName
+	}
+
+	return userName
+}
+
 func (w *Wecat) handle(msg *Message) error {
+	for _, contact := range msg.ModContactList {
+		if _, ok := w.contacts[contact.UserName]; !ok {
+			if contact.NickName == "" {
+				contact.NickName = contact.UserName
+			}
+			w.contacts[contact.UserName] = contact
+		}
+	}
+
 	for _, m := range msg.AddMsgList {
 		m.Content = strings.Replace(m.Content, "&lt;", "<", -1)
 		m.Content = strings.Replace(m.Content, "&gt;", ">", -1)
@@ -409,7 +453,7 @@ func (w *Wecat) handle(msg *Message) error {
 					(w.user.RemarkName != "" && strings.Contains(content, "@"+w.user.RemarkName)) {
 					content = strings.Replace(content, "@"+w.user.NickName, "", -1)
 					content = strings.Replace(content, "@"+w.user.RemarkName, "", -1)
-					fmt.Println("[*] ", content)
+					fmt.Println("[*] ", w.getNickName(m.FromUserName), ": ", content)
 					if w.auto {
 						reply, err := w.getReply(m.Content, m.FromUserName)
 						if err != nil {
@@ -422,14 +466,15 @@ func (w *Wecat) handle(msg *Message) error {
 						if err := w.SendMessage(reply, m.FromUserName); err != nil {
 							return err
 						}
-						fmt.Println("[#] ", reply)
+						fmt.Println("[#] ", w.user.NickName, ": ", reply)
 					}
 				} else {
-					fmt.Println("[*] ", m.Content)
+					contents := strings.Split(m.Content, ":<br/>")
+					fmt.Println("[*] ", w.getNickName(contents[0]), ": ", contents[1])
 				}
 			} else {
 				if m.FromUserName != w.user.UserName {
-					fmt.Println("[*] ", m.Content)
+					fmt.Println("[*] ", w.getNickName(m.FromUserName), ": ", m.Content)
 					if w.auto {
 						reply, err := w.getReply(m.Content, m.FromUserName)
 						if err != nil {
@@ -442,7 +487,7 @@ func (w *Wecat) handle(msg *Message) error {
 						if err := w.SendMessage(reply, m.FromUserName); err != nil {
 							return err
 						}
-						fmt.Println("[#] ", reply)
+						fmt.Println("[#] ", w.user.NickName, ": ", reply)
 					}
 				} else {
 					switch m.Content {
@@ -455,7 +500,7 @@ func (w *Wecat) handle(msg *Message) error {
 					case "隐身":
 						w.showRebot = false
 					default:
-						fmt.Println("[#] ", m.Content)
+						fmt.Println("[#] ", w.user.NickName, ": ", m.Content)
 					}
 				}
 			}
@@ -506,6 +551,7 @@ func (w *Wecat) Start() {
 	w.run("[*] login ...", w.Login)
 	w.run("[*] init wecat ...", w.Init)
 	w.run("[*] open status notify ...", w.StatusNotify)
+	w.run("[*] get contact ...", w.GetContact)
 	w.run("[*] dail sync message ...", w.Dail)
 }
 
