@@ -1,0 +1,12 @@
+tuling:
+  url: http://www.tuling123.com/openapi/api
+  keys: {
+    "lnk": {name: "lnkbot", key: "808811ad0fd34abaa6fe800b44a9556a"},
+  }
+
+log:
+  formatter: "logstash"
+  level: info
+  writer:
+    type: file
+    path: wecat.log
