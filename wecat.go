@@ -358,7 +358,6 @@ func (w *Wecat) run(desc string, f func() error) {
 }
 
 func (w *Wecat) getReply(msg string, uid string) (string, error) {
-	log.Warnf("%#v msg: %s uid: %s key: %s", w.user, msg, uid, w.cfg.Tuling.Keys[w.user.NickName])
 	params := make(map[string]interface{})
 	params["userid"] = uid
 	params["key"] = w.cfg.Tuling.Keys[w.user.NickName].Key
@@ -461,7 +460,7 @@ func (w *Wecat) handle(msg *Message) error {
 						}
 
 						if w.showRebot {
-							reply = w.cfg.Tuling.Keys[w.user.NickName].Name + reply
+							reply = w.cfg.Tuling.Keys[w.user.NickName].Name + ": " + reply
 						}
 						if err := w.SendMessage(reply, m.FromUserName); err != nil {
 							return err
@@ -482,7 +481,7 @@ func (w *Wecat) handle(msg *Message) error {
 						}
 
 						if w.showRebot {
-							reply = w.cfg.Tuling.Keys[w.user.NickName].Name + reply
+							reply = w.cfg.Tuling.Keys[w.user.NickName].Name + ": " + reply
 						}
 						if err := w.SendMessage(reply, m.FromUserName); err != nil {
 							return err
